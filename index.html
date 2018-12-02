@@ -1,0 +1,361 @@
+<!doctype html>
+<html class="no-js" lang="">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title></title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+        <link rel="stylesheet" href="css/normalize.min.css">
+        <link rel="stylesheet" href="css/main.css">
+
+        <script src="js/vendor/modernizr-2.8.3.min.js"></script>
+    </head>
+    <body>
+        <!--[if lt IE 8]>
+            <p class="browserupgrade">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+
+        <button id="generator">Next turn</button>
+
+        <div id="wrapper">
+
+            <div class="game" data-consecutive-passes=0>
+                <div class="scores"></div>
+                <div id="container-0" class="board"></div>
+            </div>
+
+            <div class="game" data-consecutive-passes=0>
+                <div class="scores"></div>
+                <div id="container-1" class="board"></div>
+            </div>
+
+            <div class="game" data-consecutive-passes=0>
+                <div class="scores"></div>
+                <div id="container-2" class="board"></div>
+            </div>
+
+        </div>
+
+
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+        <script>window.jQuery || document.write('<script src="js/vendor/jquery-1.11.2.min.js"><\/script>')</script>
+
+        <script src="js/plugins.js"></script>
+        <script src="js/main.js"></script>
+
+        <script>
+
+            Object.prototype.insertAfter = function (newNode) { this.parentNode.insertBefore(newNode, this.nextSibling); }
+
+            if (!String.prototype.format) {
+                String.prototype.format = function() {
+                    var args = arguments;
+                    return this.replace(/{(\d+)}/g, function(match, number) {
+                    return typeof args[number] != 'undefined'
+                        ? args[number]
+                        : match
+                    ;
+                    });
+                };
+            }
+
+            const Values = [];
+            Values.push('R', 'O', 'S', 'T');
+
+            function initScoreboard() {
+                for (let game of document.querySelectorAll(".scores")) {
+
+                    for (let v of Values) {
+                        let t = document.createElement("p");
+                        t.innerText = "{0}: ".format(v)
+                        let score = document.createElement("span");
+                        score.dataset.scoreof = v
+                        score.innerText = "0"
+                        t.appendChild(score)
+
+                        var btn = document.createElement('button');
+                        btn.dataset.value = v
+                        btn.dataset.role = "ban"
+                        btn.innerText = "Ban"
+                        btn.disabled = true
+                        btn.onclick = function(event) {
+                            let ctx = event.target.closest(".game")
+                            let btn = event.target
+                            let counter = ctx.querySelector("[data-role='counter'][data-value='{0}']".format(btn.dataset.value))
+                            counter.count =+ 1
+                            counter.innerText = "Bans: {0}".format(counter.count)
+                            if (counter.count == 2) {
+                                counter.count = 0
+                                let score = btn.closest("[data-scoreof='{0}']".format(btn.dataset.value))
+                                score.innerText = "0"
+                            }
+                            for (let btn of document.querySelectorAll("[data-role='ban']")) {
+                                btn.disabled = true;
+                            }
+                            banRound(parseInt(ctx.querySelector(".board").id.slice(-1)))
+                        }
+                        t.appendChild(btn);
+
+                        var btn = document.createElement('button');
+                        btn.dataset.value = v
+                        btn.dataset.role = "sacrifice"
+                        btn.innerText = "Sacrifice"
+                        btn.disabled = true
+                        btn.onclick = function(event) {
+                            let ctx = event.target.closest(".game")
+                            let btn = event.target
+                            window.turn = ctx.querySelector(".board").id.slice(-1)
+                            for (let btn of document.querySelectorAll("[data-role='ban']")) {
+                                btn.disabled = false;
+                            }
+                            for (let btn of ctx.querySelectorAll("[data-role='ban']")) {
+                                btn.disabled = true;
+                            }
+                            for (let btn of ctx.querySelectorAll("[data-role='sacrifice']")) {
+                                btn.disabled = true;
+                            }
+                            let score = ctx.querySelector("[data-scoreof='{0}']".format(btn.dataset.value))
+                            score.innerText = "0"
+                        }
+                        t.appendChild(btn);
+
+                        var btn = document.createElement('button');
+                        btn.dataset.value = v
+                        btn.dataset.count = 0
+                        btn.dataset.role = "counter"
+                        btn.innerText = "Bans: {0}".format(btn.dataset.count)
+                        btn.disabled = true
+                        t.appendChild(btn);
+
+                        game.prepend(t)
+                    }
+
+                }
+            }
+
+            function randValue(v) {
+                return v[Math.floor(Math.random() * v.length)];
+            }
+
+            function createGrid(dimension, targetElement) {
+
+                for (x = 0; x < dimension; x++) {
+
+                    var row = document.createElement("div");
+                    row.classList.add('row');
+                    targetElement.appendChild(row);
+
+                    for (y = dimension; y > 0; y--) {
+                        var el = document.createElement("div");
+                        el.dataset.x = x+1
+                        el.dataset.y = y
+                        el.classList.add('R', 'unvisited')
+                        row.appendChild(el);
+                    }
+
+                }
+            }
+
+            function createPoints(n, target) {
+                for (const x of Array(n)) {
+
+                    var elements = target.querySelectorAll(".unvisited");
+                    var rand = elements[Math.floor(Math.random() * elements.length)];
+
+                    let randVal = randValue(Values)
+                    var text = document.createTextNode(randVal);
+                    rand.appendChild(text);
+                    rand.dataset.val = randVal
+                    rand.classList.add('visited')
+                    rand.classList.remove('unvisited')
+
+                }
+            }
+
+            function dist(x1, y1, x2, y2) {
+                let pair1 = x1 + y1;
+                let pair2 = x2 + y2;
+
+                max = Math.max(pair1, pair2);
+                min = Math.min(pair1, pair2);
+
+                if (pair1 == max) {
+                    x = x1 - x2;
+                    y = y1 - y2;
+
+                    return [x1, y1, x, y];
+                }
+
+                x = x2 - x1;
+                y = y2 - y1;
+                return x, y;
+            }
+
+            // nice todo would be to implement
+            function x_traverse(ctx, steps, start, y1, b) {
+                let elements = [];
+                for (let i of Array(Math.abs(steps)).keys()) {
+                    if (Math.sign(steps) == 1) {
+                        x = parseInt(start)+i+1
+                    } else {
+                        x = parseInt(start)-i-1
+                    }
+
+                    var selector;
+                    if (b) {
+                        selector = "[data-x='{0}'][data-y='{1}']".format(x, y1)
+                    } else {
+                        selector = "[data-x='{0}'][data-y='{1}']".format(y1, x)
+                    }
+                    let el = ctx.querySelector(selector)
+                    elements.push(el)
+                }
+                return [elements, x];
+            }
+
+            function blocked(routes) {
+                for (let route of routes) {
+                    if (route.classList.contains("visited")) {
+                        return true
+                    }
+                }
+                return false
+            }
+
+            function link(ctx, val1, x1, y1, val2, x2, y2, recur) {
+
+                console.log({x1, y1, x2, y2})
+
+                let x_traversal = x2 - x1;
+                xres = x_traverse(ctx, x_traversal, x1, y1, true)
+                junction = xres[0].pop()
+                if (blocked(xres[0])) {
+                    return
+                }
+
+                var y_traversal = y2 - y1;
+                yres = x_traverse(ctx, y_traversal, y1, xres[1], false)
+                yres[0].pop()
+                if (blocked(yres[0])) {
+                    return
+                }
+
+                // only mark the route if there is no blocking elements
+                for (let p of xres[0]) {
+                    p.classList.remove('unvisited')
+                    p.classList.add("visited")
+                }
+
+                for (let p of yres[0]) {
+                    p.classList.remove('unvisited')
+                    p.classList.add("visited")
+                }
+
+                junction.classList.remove('unvisited')
+                junction.classList.add("visited")
+
+                // give score
+                if (val1 == val2) {
+                    let scoreEl = ctx.querySelector("[data-scoreof={0}]".format(val1));
+                    let score = parseInt(scoreEl.innerText);
+                    scoreEl.innerText = score+2;
+                }
+            }
+
+            function banRound(turnOf) {
+                if (window.turn == 2) {
+                    return
+                }
+                let ctx = document.getElementById("container-{0}".format(turnOf)).parentNode
+
+                let zeros = 0
+                let nonZero = []
+                for (let score of ctx.querySelectorAll("[data-scoreof]")) {
+                    scoreVal = parseInt(score.innerText)
+                    // if less than 0 dont let sacrifce
+                    if (scoreVal <= 0) {
+                        continue
+                    }
+                    nonZero.push(score.dataset.scoreof)
+                }
+
+                if (zeros == 4) {
+                    banRound(turnOf += 1)
+                    return
+                }
+
+                for (let sacrificiable of nonZero) {
+                    for (let btn of ctx.querySelectorAll("[data-role='sacrifice'][data-value='{0}']".format(sacrificiable))) {
+                        btn.disabled = false
+                    }
+                }
+            }
+
+            document.getElementById("generator").addEventListener("click", function(){
+
+                for (let i of Array(3).keys()) {
+
+                    var container = document.getElementById("container-{0}".format(i));
+                    createPoints(5, container);
+                }
+
+                window.turn = 0
+
+                banRound(0);
+            });
+
+            document.addEventListener('DOMContentLoaded', function() {
+
+                initScoreboard()
+
+                for (let i of Array(3).keys()) {
+
+                    var container = document.getElementById("container-{0}".format(i));
+
+                    var dimension = 15
+                    createGrid(dimension, container)
+
+                    var points = 5
+                    createPoints(points, container)
+
+                }
+
+            })
+
+            document.addEventListener('click', function (event) {
+
+                // If the clicked element doesn't have the right selector, bail
+                if (!event.target.matches('.visited')) return;
+
+                // Don't follow the link
+                event.preventDefault();
+
+                if (this.mem) {
+                    link(event.target.closest(".game"), this.mem.val, this.mem.x, this.mem.y, event.target.dataset.val, event.target.dataset.x, event.target.dataset.y)
+                    delete(this.mem)
+                    return
+                }
+
+                this.mem = {}
+                this.mem.val = event.target.dataset.val
+                this.mem.x = event.target.dataset.x
+                this.mem.y = event.target.dataset.y
+
+            }, false);
+
+        </script>
+
+        <!-- Google Analytics: change UA-XXXXX-X to be your site's ID. -->
+        <script>
+            (function(b,o,i,l,e,r){b.GoogleAnalyticsObject=l;b[l]||(b[l]=
+            function(){(b[l].q=b[l].q||[]).push(arguments)});b[l].l=+new Date;
+            e=o.createElement(i);r=o.getElementsByTagName(i)[0];
+            e.src='//www.google-analytics.com/analytics.js';
+            r.parentNode.insertBefore(e,r)}(window,document,'script','ga'));
+            ga('create','UA-XXXXX-X','auto');ga('send','pageview');
+        </script>
+    </body>
+</html>
